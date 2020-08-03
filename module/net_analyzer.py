@@ -4,7 +4,25 @@ import socket
 from scapy.all import *
 from scapy.layers import dns
 from scapy.layers.inet import IP, TCP, UDP
+import TCPflow
 
+IRC_commands = ['ADMIN', 'AWAY', 'CNOTICE', 'CPRIVMSG', 'CONNECT', 'DIE', 'ENCAP', 'ERROR', 'HELP', 'INFO',\
+                'INVITE', 'ISON', 'JOIN', 'KICK', 'KILL', 'NOCK', 'LINKS', 'LIST', 'LUSERS', 'MODE', 'MOTD',\
+                'NAMES', 'NAMESX', 'NICK', 'NOTICE', 'OPER', 'PART', 'PASS', 'PING', 'PONG', 'PRIVMSG', 'QUIT',\
+                'REHASH', 'RESTART', 'RULES', 'SERVER', 'SERVICE', 'SERVLIST', 'SQUERY', 'SQUIT', 'SETNAME',\
+                'SILENCE', 'STATS', 'SUMMON', 'TIME', 'TOPIC', 'TRACE', 'UHNAMES', 'USER', 'USERHOST', 'USERIP',\
+                'USERS', 'VERSION', 'WALLOPS', 'WATCH', 'WHO', 'WHOIS', 'WHOWAS']
+
+def analyze_DNS(packet):
+    auxdict = {}
+    # No comprobamos la capa DNSQR ya que el protocolo MDNS puede dar problemas ya que algunos paquetes no
+    # contienen la query a la que responden.
+    if packet.haslayer(DNSRR):
+        key = packet[DNSRR].rrname.decode("utf-8")
+        auxdict[key] = []
+        for i in range(packet[DNS].ancount):       
+            auxdict[key].append(packet[DNSRR][i].rdata)
+    return auxdict
 
 
 def traffic_parser(sample_name, hostIP, sshPort):
@@ -25,7 +43,7 @@ def trace_analyzer(trace):
     protocol_list = []
     IPtemp_list = []
     prototemp_list =  []
-    DNS_list = []
+    DNS_dict = {}
     for packet in trace:
         if packet.haslayer(IP):
             IPtemp_list.append(packet[IP].src)
@@ -33,9 +51,7 @@ def trace_analyzer(trace):
             prototemp_list.append(packet.proto)
         if packet.haslayer(DNS):
             protocol_list.append("DNS")
-            for i in range(packet[DNS].ancount):                
-                DNS_list.append(packet[DNSRR][i].rrname)
-
+            DNS_dict.update(analyze_DNS(packet))
         # if packet.haslayer(IRC):
         #    prototemp_list.append(packet.proto)
 
@@ -47,14 +63,18 @@ def trace_analyzer(trace):
         protocol_list.append(table[proto])
     IP_list = set(IPtemp_list)
     protocol_list = set(protocol_list)
-    DNS_list = set(DNS_list)
+    
     
     fIP = open ("C:\\PRUEBASDESO\\IP.txt", "w")
     fDNS = open("C:\\PRUEBASDESO\\DNS.txt", "w")
     fprt = open("C:\\PRUEBASDESO\\Proto.txt", "w")
     fIP.write(str(IP_list))
-    fDNS.write(str(DNS_list))
+    fDNS.write(str(DNS_dict))
     fprt.write(str(protocol_list))
+
+
+
+
 
 def main(file):
     trace = traffic_parser(file,"10.0.0.100", 22)
