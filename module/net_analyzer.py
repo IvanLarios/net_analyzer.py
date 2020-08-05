@@ -1,6 +1,7 @@
 # encoding: utf-8
 
 import socket
+import json
 from scapy.all import *
 from scapy.layers import dns
 from scapy.layers.inet import IP, TCP, UDP
@@ -12,6 +13,22 @@ IRC_commands = ['ADMIN', 'AWAY', 'CNOTICE', 'CPRIVMSG', 'CONNECT', 'DIE', 'ENCAP
                 'REHASH', 'RESTART', 'RULES', 'SERVER', 'SERVICE', 'SERVLIST', 'SQUERY', 'SQUIT', 'SETNAME',\
                 'SILENCE', 'STATS', 'SUMMON', 'TIME', 'TOPIC', 'TRACE', 'UHNAMES', 'USER', 'USERHOST', 'USERIP',\
                 'USERS', 'VERSION', 'WALLOPS', 'WATCH', 'WHO', 'WHOIS', 'WHOWAS']
+
+def analyze_TCP(packet, connectDict):
+
+    if packet.haslayer(TCP):
+        if str(packet[TCP].flags) == "S":
+            if packet[IP].src in connectDict:
+                if packet[IP].dst in connectDict[packet[IP].src]:
+                    connectDict[packet[IP].src][packet[IP].dst]['counter'] += 1
+                else:
+                    connectDict[packet[IP].src][packet[IP].dst] = \
+                    {'sport' : packet[TCP].sport, 'dport' : packet[TCP].dport, 'counter' : 1}
+            else:
+                connectDict[packet[IP].src] = {}
+                connectDict[packet[IP].src][packet[IP].dst] = \
+                    {'sport' : packet[TCP].sport, 'dport' : packet[TCP].dport, 'counter' : 1}
+
 
 def analyze_DNS(packet):
     auxdict = {}
@@ -72,6 +89,9 @@ def trace_analyzer(trace):
     TTL_suspicious_packets = []
     prototemp_list =  []
     DNS_dict = {}
+
+    conDict = {}
+
     for packet in trace:
         if packet.haslayer(IP):
             prototemp_list.append(packet.proto)
@@ -90,6 +110,7 @@ def trace_analyzer(trace):
         if packet.haslayer(TCP):
             port_list.append(packet[TCP].sport)
             port_list.append(packet[TCP].dport)
+            analyze_TCP(packet, conDict)
         if packet.haslayer(DNS):
             protocol_list.append("DNS")
             DNS_dict.update(analyze_DNS(packet))
@@ -107,11 +128,13 @@ def trace_analyzer(trace):
     fIP = open ("C:\\PRUEBASDESO\\IP.txt", "w")
     fDNS = open("C:\\PRUEBASDESO\\DNS.txt", "w")
     fprt = open("C:\\PRUEBASDESO\\Proto.txt", "w")
+    fDict = open("C:\\PRUEBASDESO\\ConDict.txt", "w")
 
     fIP.write(str(IP_list))
     fDNS.write(str(DNS_dict))
     fprt.write("Protocol list\n" + str(set(protocol_list)))
     fprt.write("\nPort list\n" + str(port_list))
+    fDict.write(json.dumps(conDict, indent=2))
 
 
 
