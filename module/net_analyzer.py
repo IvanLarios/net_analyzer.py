@@ -19,7 +19,7 @@ def analyze_DNS(packet):
     #################################
     ### Domain Queries extraction ###
     #################################
-    
+
     # No comprobamos la capa DNSQR ya que el protocolo MDNS puede dar problemas ya que algunos paquetes no
     # contienen la query a la que responden.
     if packet.haslayer(DNSRR):
@@ -68,6 +68,7 @@ def traffic_parser(sample_name, hostIP, sshPort):
 def trace_analyzer(trace):
     IP_list = {}
     protocol_list = []
+    port_list = []
     TTL_suspicious_packets = []
     prototemp_list =  []
     DNS_dict = {}
@@ -76,15 +77,19 @@ def trace_analyzer(trace):
             prototemp_list.append(packet.proto)
             result = analyze_IP(packet, TTL_suspicious_packets)
             # If the IPs obtained are not in the dictionary we add them
-            if result.keys() not in IP_list.keys():
+            if not all(key in result.keys() for key in IP_list.keys()):
                 IP_list.update(result)
             # If the IPs are in the dictionary already we check if they were marked as suspicious
             else:
                 for key in result.keys():
-                    if IP_list[key] != result[key]:
+                    if not key in IP_list:
+                        IP_list[key] = result[key]
+                    elif IP_list[key] != result[key]:
                         # If they were once marked as suspicious IPs, they remain suspicious
                         IP_list[key] = 1
-
+        if packet.haslayer(TCP):
+            port_list.append(packet[TCP].sport)
+            port_list.append(packet[TCP].dport)
         if packet.haslayer(DNS):
             protocol_list.append("DNS")
             DNS_dict.update(analyze_DNS(packet))
@@ -92,20 +97,21 @@ def trace_analyzer(trace):
         #    prototemp_list.append(packet.proto)
 
   
-
-    #Socket class has stored every protocol prefixed with "IPPROTO" with it's number given by the IANA
-    table = {num: name[8:] for name, num in vars(socket).items() if name.startswith("IPPROTO")}
+    #Socket class has stored every protocol prefixed with "IPPROTO" with it's number given by the IANA. Credits: https://stackoverflow.com/questions/37004965/how-to-turn-protocol-number-to-name-with-python
+    table = {num: name[8:] for name, num in vars(
+        socket).items() if name.startswith("IPPROTO")}
     for proto in set(prototemp_list):
         protocol_list.append(table[proto])
-    
+    port_list = list(set(port_list))
+    list.sort(port_list)
     fIP = open ("C:\\PRUEBASDESO\\IP.txt", "w")
     fDNS = open("C:\\PRUEBASDESO\\DNS.txt", "w")
     fprt = open("C:\\PRUEBASDESO\\Proto.txt", "w")
 
     fIP.write(str(IP_list))
     fDNS.write(str(DNS_dict))
-    fprt.write(str(protocol_list))
-
+    fprt.write("Protocol list\n" + str(set(protocol_list)))
+    fprt.write("\nPort list\n" + str(port_list))
 
 
 
