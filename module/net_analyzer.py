@@ -1,18 +1,46 @@
 # encoding: utf-8
 
 import socket
+import requests
 import json
+import shodan
+import time
+from config import *
+from netaddr import *
 from scapy.all import *
 from scapy.layers import dns
 from scapy.layers.inet import IP, TCP, UDP
-import TCPflow
 
-IRC_commands = ['ADMIN', 'AWAY', 'CNOTICE', 'CPRIVMSG', 'CONNECT', 'DIE', 'ENCAP', 'ERROR', 'HELP', 'INFO',\
-                'INVITE', 'ISON', 'JOIN', 'KICK', 'KILL', 'NOCK', 'LINKS', 'LIST', 'LUSERS', 'MODE', 'MOTD',\
-                'NAMES', 'NAMESX', 'NICK', 'NOTICE', 'OPER', 'PART', 'PASS', 'PING', 'PONG', 'PRIVMSG', 'QUIT',\
-                'REHASH', 'RESTART', 'RULES', 'SERVER', 'SERVICE', 'SERVLIST', 'SQUERY', 'SQUIT', 'SETNAME',\
-                'SILENCE', 'STATS', 'SUMMON', 'TIME', 'TOPIC', 'TRACE', 'UHNAMES', 'USER', 'USERHOST', 'USERIP',\
-                'USERS', 'VERSION', 'WALLOPS', 'WATCH', 'WHO', 'WHOIS', 'WHOWAS']
+
+
+
+# VT Key only valid   for 4 req/min
+vt_key = getKey()
+
+#  IRC_commands = ['ADMIN', 'AWAY', 'CNOTICE', 'CPRIVMSG', 'CONNECT', 'DIE', 'ENCAP', 'ERROR', 'HELP', 'INFO',\
+#                 'INVITE', 'ISON', 'JOIN', 'KICK', 'KILL', 'NOCK', 'LINKS', 'LIST', 'LUSERS', 'MODE', 'MOTD',\
+#                 'NAMES', 'NAMESX', 'NICK', 'NOTICE', 'OPER', 'PART', 'PASS', 'PING', 'PONG', 'PRIVMSG', 'QUIT',\
+#                 'REHASH', 'RESTART', 'RULES', 'SERVER', 'SERVICE', 'SERVLIST', 'SQUERY', 'SQUIT', 'SETNAME',\
+#                 'SILENCE', 'STATS', 'SUMMON', 'TIME', 'TOPIC', 'TRACE', 'UHNAMES', 'USER', 'USERHOST', 'USERIP',\
+#                 'USERS', 'VERSION', 'WALLOPS', 'WATCH', 'WHO', 'WHOIS', 'WHOWAS']
+
+def vt_request(IPs):
+    results = {}
+    url = 'https://www.virustotal.com/vtapi/v2/ip-address/report'
+    for ip in IPs:
+        params = {'apikey': vt_key, 'ip': ip}
+        time.sleep(15.1)
+        response = requests.get(url, params=params)
+        data = response.json()
+        if data['response_code'] == 1:
+            results[ip] = data
+        else:
+            results[ip] = 0
+    return results
+
+# def shodan_request(ip):
+#     vt = 0
+
 
 def analyze_TCP(packet, connectDict):
 
@@ -89,7 +117,7 @@ def trace_analyzer(trace):
     TTL_suspicious_packets = []
     prototemp_list =  []
     DNS_dict = {}
-
+    IP2req = []
     conDict = {}
 
     for packet in trace:
@@ -117,6 +145,9 @@ def trace_analyzer(trace):
         # if packet.haslayer(IRC):
         #    prototemp_list.append(packet.proto)
 
+    ####################################
+    #### RESULT PREPARATION ############
+    ####################################
   
     #Socket class has stored every protocol prefixed with "IPPROTO" with it's number given by the IANA. Credits: https://stackoverflow.com/questions/37004965/how-to-turn-protocol-number-to-name-with-python
     table = {num: name[8:] for name, num in vars(
@@ -125,12 +156,23 @@ def trace_analyzer(trace):
         protocol_list.append(table[proto])
     port_list = list(set(port_list))
     list.sort(port_list)
+
+    for ip in IP_list.keys():
+        if not (IPAddress(ip).is_private() or IPAddress(ip).is_loopback()):
+            if IP_list[ip] == 1:
+                IP2req.append(ip)
+
+    # We send the suspicious IP to get their reports from VirusTotal
+    results = vt_request(IP2req)
+
     fIP = open ("C:\\PRUEBASDESO\\IP.txt", "w")
+    fIPvt = open ("C:\\PRUEBASDESO\\vtIPresults.json", "w")
     fDNS = open("C:\\PRUEBASDESO\\DNS.txt", "w")
     fprt = open("C:\\PRUEBASDESO\\Proto.txt", "w")
     fDict = open("C:\\PRUEBASDESO\\ConDict.txt", "w")
 
-    fIP.write(str(IP_list))
+    fIP.write(str(set(IP2req)))
+    fIPvt.write(json.dumps(results, indent=2))
     fDNS.write(str(DNS_dict))
     fprt.write("Protocol list\n" + str(set(protocol_list)))
     fprt.write("\nPort list\n" + str(port_list))
