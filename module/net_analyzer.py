@@ -1,18 +1,16 @@
 # encoding: utf-8
 
-import socket
-import requests
 import json
-import shodan
+import socket
 import time
-from config import *
+
+import requests
 from netaddr import *
 from scapy.all import *
 from scapy.layers import dns
 from scapy.layers.inet import IP, TCP, UDP
 
-
-
+from config import *
 
 # VT Key only valid   for 4 req/min
 vt_key = getKey()
@@ -23,6 +21,11 @@ vt_key = getKey()
 #                 'REHASH', 'RESTART', 'RULES', 'SERVER', 'SERVICE', 'SERVLIST', 'SQUERY', 'SQUIT', 'SETNAME',\
 #                 'SILENCE', 'STATS', 'SUMMON', 'TIME', 'TOPIC', 'TRACE', 'UHNAMES', 'USER', 'USERHOST', 'USERIP',\
 #                 'USERS', 'VERSION', 'WALLOPS', 'WATCH', 'WHO', 'WHOIS', 'WHOWAS']
+
+#################################################
+### Se realiza una vez para que no se sobrepasen el limite
+### de 4 request/min
+#################################################
 
 def vt_request(IPs):
     results = {}
@@ -38,8 +41,6 @@ def vt_request(IPs):
             results[ip] = 0
     return results
 
-# def shodan_request(ip):
-#     vt = 0
 
 
 def analyze_TCP(packet, connectDict):
@@ -136,8 +137,10 @@ def trace_analyzer(trace):
                         # If they were once marked as suspicious IPs, they remain suspicious
                         IP_list[key] = 1
         if packet.haslayer(TCP):
-            port_list.append(packet[TCP].sport)
-            port_list.append(packet[TCP].dport)
+            if packet[TCP].sport < 49151:
+                port_list.append(packet[TCP].sport)
+            if packet[TCP].dport < 49151:
+                port_list.append(packet[TCP].dport)
             analyze_TCP(packet, conDict)
         if packet.haslayer(DNS):
             protocol_list.append("DNS")
@@ -162,16 +165,22 @@ def trace_analyzer(trace):
             if IP_list[ip] == 1:
                 IP2req.append(ip)
 
-    # We send the suspicious IP to get their reports from VirusTotal
+    for key in conDict:
+        for key2 in conDict[key]:
+            if conDict[key][key2]['counter'] > 5:
+                if not (IPAddress(key2).is_private() or IPAddress(key2).is_loopback()):
+                    IP2req.append(key2)
+                if not (IPAddress(key).is_private() or IPAddress(key).is_loopback()):
+                    IP2req.append(key)
+
+    # We send the suspicious IPs to get their reports from VirusTotal
     results = vt_request(IP2req)
 
-    fIP = open ("C:\\PRUEBASDESO\\IP.txt", "w")
     fIPvt = open ("C:\\PRUEBASDESO\\vtIPresults.json", "w")
     fDNS = open("C:\\PRUEBASDESO\\DNS.txt", "w")
-    fprt = open("C:\\PRUEBASDESO\\Proto.txt", "w")
-    fDict = open("C:\\PRUEBASDESO\\ConDict.txt", "w")
+    fprt = open("C:\\PRUEBASDESO\\Ports.txt", "w")
+    fDict = open("C:\\PRUEBASDESO\\ConDict.json", "w")
 
-    fIP.write(str(set(IP2req)))
     fIPvt.write(json.dumps(results, indent=2))
     fDNS.write(str(DNS_dict))
     fprt.write("Protocol list\n" + str(set(protocol_list)))
