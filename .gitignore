@@ -130,3 +130,4 @@ dmypy.json
 
 # Hidden keys
 config.py
+samples_label.txt

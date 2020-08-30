@@ -1,9 +1,9 @@
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.model_selection import ShuffleSplit
-
+from sklearn.model_selection import train_test_split
+import time
 import matplotlib.pyplot as plt
 import numpy as np
 from syscall_parser import count_syscalls
@@ -29,9 +29,9 @@ samples_data = f.read().split("\n")
 f.close()
 
 samples_label_dict = {}
-
-dictionary = count_syscalls("LIMIT 2000")
-
+print("Getting and preparing features...")
+t = time.time()
+dictionary = count_syscalls(0)
 for sample in samples_data:
     name = sample.split(" ")[0]
     label = sample.split(" ")[1]
@@ -39,8 +39,8 @@ for sample in samples_data:
         samples_label_dict[name] = label
 
 intersection = []
-for key in query[1].keys():
-    if query[1][key] in samples_label_dict.keys():
+for key in dictionary.keys():
+    if key in samples_label_dict.keys():
         intersection.append(key)
 
 values = []
@@ -55,13 +55,19 @@ features = v.get_feature_names()
 
 y = []
 for key in hashes:
-    y.append(samples_label_dict[query[1][key]])
+    y.append(samples_label_dict[key])
 
-sss = ShuffleSplit(n_splits=10, random_state=0, test_size=0.7)
-train, test = sss.split(X, y)
-print(test)
-print("Train:\n")
-print(train)
-# clf = RandomForestClassifier(max_depth=5, random_state=0)
-# clf.fit(X, y)
-# clf.predict()
+print("Features extracted and prepared in " + str(time.time()-t)+" seconds.")
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=0)
+print("Training...")
+t0 = time.time()
+clf = RandomForestClassifier()#max_depth=5, random_state=0)
+clf.fit(X_train, y_train)
+t1 = time.time()
+print("Training finished in "+str(t1-t0)+" seconds.")
+print("Starting score evaluation...")
+print(clf.score(X_test,y_test))
+t2 = time.time()
+print("Score evaluation finished in "+str(t2-t1)+" seconds.")
+print("Total time for training and evaluating: "+str(t2-t0)+" seconds.")
