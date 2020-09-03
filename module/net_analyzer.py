@@ -85,7 +85,7 @@ def analyze_IP(packet, abnormal_list):
     ttl = packet.ttl
     # TTL analyzer -> Basado en "Using abnormal TTL values to detect malicious IP packets" de Yamada, R. y Goto, S.
     if (1 < ttl <= 30) or (64 < ttl <= 98) or (128< ttl <= 225):
-        abnormal_list.append(packet)
+        #abnormal_list.append(packet)
         abFlag = 1
 
     ####################################

@@ -1,7 +1,9 @@
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import ShuffleSplit
+from sklearn.svm import SVC
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 import time
 import matplotlib.pyplot as plt
@@ -63,11 +65,14 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_
 print("Training...")
 t0 = time.time()
 clf = RandomForestClassifier()#max_depth=5, random_state=0)
+svc = make_pipeline(StandardScaler(),SVC(gamma="auto"))
 clf.fit(X_train, y_train)
+svc.fit(X_train, y_train)
 t1 = time.time()
 print("Training finished in "+str(t1-t0)+" seconds.")
 print("Starting score evaluation...")
-print(clf.score(X_test,y_test))
+print("Classification for Random Forest: "+ str(clf.score(X_test,y_test)))
+print("Classification for SVC: " + str(svc.score(X_test, y_test)))
 t2 = time.time()
 print("Score evaluation finished in "+str(t2-t1)+" seconds.")
 print("Total time for training and evaluating: "+str(t2-t0)+" seconds.")
