@@ -3,7 +3,7 @@ import json
 
 def count_syscalls(param):
     counter = {}
-    results = get_data_bbdd("name, analisis",0,"web_muestra",param)
+    results = get_data_bbdd(".\\db.sqlite3", "name, analisis", 0, "web_muestra", param)
     # Añadir syscalls
     for result in results:
         data = json.loads(result[1])

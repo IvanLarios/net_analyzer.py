@@ -1,11 +1,12 @@
 import sqlite3
+import time
 
-def get_data_bbdd(fields, hash, table, param):
+def get_data_bbdd(path,fields, hash, table, param):
     # Connection
-    sqliteConnection = sqlite3.connect(r"C:\Users\Iván\Desktop\TFG Github\net_analyzer.py\db.sqlite3")
+    sqliteConnection = sqlite3.connect(path)
     cursor = sqliteConnection.cursor()
-
-
+    print("Conected to the database, executing Query ")
+    start = time.time()
     # Execute query
     if hash != 0:
         cursor.execute("SELECT "+ fields +" FROM "+table+" WHERE hash != '" + hash + "';")
@@ -19,5 +20,5 @@ def get_data_bbdd(fields, hash, table, param):
     # Commit changes and close the connection
     sqliteConnection.commit()
     sqliteConnection.close()
-
+    print("Query executed in " + str(time.time()-start)+" seconds.")
     return results

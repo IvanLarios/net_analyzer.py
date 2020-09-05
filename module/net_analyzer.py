@@ -11,17 +11,23 @@ from scapy.layers import dns
 from scapy.layers.inet import IP, TCP, UDP
 
 from config import *
+import argparse
 
 # VT Key only valid   for 4 req/min
 vt_key = getKey()
 
-#  IRC_commands = ['ADMIN', 'AWAY', 'CNOTICE', 'CPRIVMSG', 'CONNECT', 'DIE', 'ENCAP', 'ERROR', 'HELP', 'INFO',\
-#                 'INVITE', 'ISON', 'JOIN', 'KICK', 'KILL', 'NOCK', 'LINKS', 'LIST', 'LUSERS', 'MODE', 'MOTD',\
-#                 'NAMES', 'NAMESX', 'NICK', 'NOTICE', 'OPER', 'PART', 'PASS', 'PING', 'PONG', 'PRIVMSG', 'QUIT',\
-#                 'REHASH', 'RESTART', 'RULES', 'SERVER', 'SERVICE', 'SERVLIST', 'SQUERY', 'SQUIT', 'SETNAME',\
-#                 'SILENCE', 'STATS', 'SUMMON', 'TIME', 'TOPIC', 'TRACE', 'UHNAMES', 'USER', 'USERHOST', 'USERIP',\
-#                 'USERS', 'VERSION', 'WALLOPS', 'WATCH', 'WHO', 'WHOIS', 'WHOWAS']
+parser = argparse.ArgumentParser(
+    description='Obtains useful information about suspicious packets in the given trace.')
 
+parser.add_argument(
+    "-p", "--path", default="C:\\PRUEBASDESO\\TRAFFICEX", help="Pcap file path.")
+parser.add_argument(
+    "-a", "--address", help="Address of the host connected to the sandbox.")
+
+args = parser.parse_args()
+
+path = str(args.path)
+addr = str(args.address)
 #################################################
 ### Se realiza una vez para que no se sobrepasen el limite
 ### de 4 request/min
@@ -40,7 +46,6 @@ def vt_request(IPs):
         else:
             results[ip] = 0
     return results
-
 
 
 def analyze_TCP(packet, connectDict):
@@ -69,10 +74,10 @@ def analyze_DNS(packet):
     # No comprobamos la capa DNSQR ya que el protocolo MDNS puede dar problemas ya que algunos paquetes no
     # contienen la query a la que responden.
     if packet.haslayer(DNSRR):
-        key = packet[DNSRR].rrname.decode("utf-8")
+        key = str(packet[DNSRR].rrname.decode("utf-8"))
         auxdict[key] = []
         for i in range(packet[DNS].ancount):       
-            auxdict[key].append(packet[DNSRR][i].rdata)
+            auxdict[key].append(str(packet[DNSRR][i].rdata))
     return auxdict
 
 def analyze_IP(packet, abnormal_list):
@@ -102,12 +107,13 @@ def traffic_parser(sample_name, hostIP, sshPort):
     clean_trace = []
     packets = rdpcap(sample_name+".pcap")
     #Eliminamos paquetes de nuestra conexión con la sandbox
-    for packet in packets:
-        if packet.haslayer(TCP):
-            if not(packet[TCP].sport is sshPort and packet[IP].src is hostIP) or (packet[TCP].dport is sshPort and packet[IP].dst is hostIP):
+    if hostIP != None:
+        for packet in packets:
+            if packet.haslayer(TCP):
+                if not(packet[TCP].sport is sshPort and packet[IP].src is hostIP) or (packet[TCP].dport is sshPort and packet[IP].dst is hostIP):
+                    clean_trace.append(packet)
+            else:
                 clean_trace.append(packet)
-        else:
-            clean_trace.append(packet)
 
     return clean_trace
 
@@ -137,16 +143,16 @@ def trace_analyzer(trace):
                         # If they were once marked as suspicious IPs, they remain suspicious
                         IP_list[key] = 1
         if packet.haslayer(TCP):
-            if packet[TCP].sport < 49151:
-                port_list.append(packet[TCP].sport)
-            if packet[TCP].dport < 49151:
+            if (packet[TCP].sport > 1024) and (packet[TCP].dport > 1024):
+                port_list.append(min(packet[TCP].sport, packet[TCP].dport))
+            elif packet[TCP].dport < 1024:
                 port_list.append(packet[TCP].dport)
+            elif packet[TCP].sport < 1024:
+                port_list.append(packet[TCP].sport)
             analyze_TCP(packet, conDict)
         if packet.haslayer(DNS):
             protocol_list.append("DNS")
             DNS_dict.update(analyze_DNS(packet))
-        # if packet.haslayer(IRC):
-        #    prototemp_list.append(packet.proto)
 
     ####################################
     #### RESULT PREPARATION ############
@@ -176,22 +182,20 @@ def trace_analyzer(trace):
     # We send the suspicious IPs to get their reports from VirusTotal
     results = vt_request(IP2req)
 
-    fIPvt = open ("C:\\PRUEBASDESO\\vtIPresults.json", "w")
-    fDNS = open("C:\\PRUEBASDESO\\DNS.txt", "w")
-    fprt = open("C:\\PRUEBASDESO\\Ports.txt", "w")
-    fDict = open("C:\\PRUEBASDESO\\ConDict.json", "w")
+    fIPvt = open("..\\results\\vtIPresults.json", "w")
+    fDNS = open("..\\results\\DNS.json", "w")
+    fprt = open("..\\results\\Ports.txt", "w")
+    fDict = open("..\\results\\ConDict.json", "w")
 
     fIPvt.write(json.dumps(results, indent=2))
-    fDNS.write(str(DNS_dict))
+    fDNS.write(json.dumps(DNS_dict, indent=4))
     fprt.write("Protocol list\n" + str(set(protocol_list)))
     fprt.write("\nPort list\n" + str(port_list))
     fDict.write(json.dumps(conDict, indent=2))
 
 
-
-
-def main(file):
-    trace = traffic_parser(file,"10.0.0.100", 22)
+def net_analyzer(file):
+    trace = traffic_parser(file,addr, 22)
     trace_analyzer(trace)
-
-main("C:\\PRUEBASDESO\\TRAFFICEX")
+#Comment the following line if you integrate this module
+net_analyzer(path)
