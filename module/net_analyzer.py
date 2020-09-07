@@ -195,7 +195,7 @@ def trace_analyzer(trace):
 
 
 def net_analyzer(file):
-    trace = traffic_parser(file,addr, 22)
+    trace = traffic_parser(file,addr, 22) #Change port if SSH is ran in a different port.
     trace_analyzer(trace)
 #Comment the following line if you integrate this module
 net_analyzer(path)
