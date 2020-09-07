@@ -23,17 +23,19 @@ parser.add_argument(
     "-p", "--path", default="C:\\PRUEBASDESO\\TRAFFICEX", help="Pcap file path.")
 parser.add_argument(
     "-a", "--address", help="Address of the host connected to the sandbox.")
-
+parser.add_argument(
+    "-d", "--domain", help="Gets reports about the domains that appear in the pcap file.", action="store_true")
 args = parser.parse_args()
 
 path = str(args.path)
 addr = str(args.address)
+doDomain = args.domain
 #################################################
 ### Se realiza una vez para que no se sobrepasen el limite
 ### de 4 request/min
 #################################################
 
-def vt_request(IPs):
+def vt_request(IPs, DNSqs):
     results = {}
     url = 'https://www.virustotal.com/vtapi/v2/ip-address/report'
     for ip in IPs:
@@ -45,6 +47,17 @@ def vt_request(IPs):
             results[ip] = data
         else:
             results[ip] = 0
+    if doDomain:
+        url = 'https://www.virustotal.com/vtapi/v2/domain/report'
+        for domain in DNSqs:
+            time.sleep(15.1)
+            params = {'apikey': vt_key, 'domain': domain}
+            response = requests.get(url, params=params)
+            data = response.json()
+            if data['response_code'] == 1:
+                results[domain] = data
+            else:
+                results[domain] = 0
     return results
 
 
@@ -105,7 +118,13 @@ def analyze_IP(packet, abnormal_list):
 
 def traffic_parser(sample_name, hostIP, sshPort):
     clean_trace = []
-    packets = rdpcap(sample_name+".pcap")
+    print("Reading pcap file...")
+    if sample_name[-5:] == '.pcap':
+        packets = rdpcap(sample_name)
+        print("Found and read " + str(path))
+    else:
+        packets = rdpcap(sample_name+".pcap")
+        print("Found and read "+ str(path)+".pcap")
     #Eliminamos paquetes de nuestra conexión con la sandbox
     if hostIP != None:
         for packet in packets:
@@ -180,7 +199,7 @@ def trace_analyzer(trace):
                     IP2req.append(key)
 
     # We send the suspicious IPs to get their reports from VirusTotal
-    results = vt_request(IP2req)
+    results = vt_request(IP2req, DNS_dict)
 
     fIPvt = open("..\\results\\vtIPresults.json", "w")
     fDNS = open("..\\results\\DNS.json", "w")
