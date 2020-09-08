@@ -211,7 +211,7 @@ def trace_analyzer(trace):
     fprt.write("Protocol list\n" + str(set(protocol_list)))
     fprt.write("\nPort list\n" + str(port_list))
     fDict.write(json.dumps(conDict, indent=2))
-
+    print("Files stored in ..\\results\\")
 
 def net_analyzer(file):
     trace = traffic_parser(file,addr, 22) #Change port if SSH is ran in a different port.
