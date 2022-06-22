@@ -1,5 +1,5 @@
 scapy==2.4.4
 netaddr==0.8.0
-numpy==1.19.1
+numpy==1.22.0
 scikit-learn==0.23.2
 matplotlib==3.3.0
